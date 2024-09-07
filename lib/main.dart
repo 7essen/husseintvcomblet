@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -30,7 +29,8 @@ void callbackDispatcher() {
 
 Future fetchAllData() async {
   try {
-    final matchesResponse = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
+    final matchesResponse = await http
+        .get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
     if (matchesResponse.statusCode == 200) {
       final matchesData = json.decode(matchesResponse.body)['data'];
       for (var match in matchesData) {
@@ -47,25 +47,32 @@ Future<void> scheduleMatchNotification(dynamic match) async {
   final matchTime = match['attributes']['matchTime'] ?? '00:00';
   final now = DateTime.now();
   final matchDateTime = DateFormat('HH:mm').parse(matchTime);
-  final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
+  final matchDateTimeWithToday = DateTime(
+      now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
 
   // تحقق إذا كانت المباراة ستبدأ خلال 5 دقائق
-  if (matchDateTimeWithToday.isAfter(now) && matchDateTimeWithToday.isBefore(now.add(Duration(minutes: 5)))) {
-    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-    var initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    var initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  if (matchDateTimeWithToday.isAfter(now) &&
+      matchDateTimeWithToday.isBefore(now.add(Duration(minutes: 5)))) {
+    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+        FlutterLocalNotificationsPlugin();
+    var initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    var initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
     var androidPlatformChannelSpecifics = AndroidNotificationDetails(
       'your_channel_id',
       'your_channel_name',
-      channelDescription: 'your_channel_description', // استخدم channelDescription بدلاً من الوصف
+      channelDescription:
+          'your_channel_description', // استخدم channelDescription بدلاً من الوصف
       importance: Importance.max,
       priority: Priority.high,
       showWhen: false,
     );
 
-    var platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+    var platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
 
     await flutterLocalNotificationsPlugin.show(
       0,
@@ -136,7 +143,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<List> fetchChannelCategories() async {
     try {
-      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
+      final response = await http.get(Uri.parse(
+          'https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['data'] ?? [];
@@ -151,7 +159,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<List> fetchNews() async {
     try {
-      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
+      final response = await http
+          .get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['data'] ?? [];
@@ -166,7 +175,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<List> fetchMatches() async {
     try {
-      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
+      final response = await http.get(
+          Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['data'] ?? [];
@@ -275,7 +285,8 @@ class ChannelBox extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => CategoryChannelsScreen(channels: category['attributes']['channels']['data'] ?? []),
+              builder: (context) => CategoryChannelsScreen(
+                  channels: category['attributes']['channels']['data'] ?? []),
             ),
           );
         },
@@ -373,8 +384,10 @@ class MatchBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final teamA = match['attributes']['teamA'] ?? 'Team A';
     final teamB = match['attributes']['teamB'] ?? 'Team B';
-    final logoA = match['attributes']['logoA']['data']['attributes']['url'] ?? '';
-    final logoB = match['attributes']['logoB']['data']['attributes']['url'] ?? '';
+    final logoA =
+        match['attributes']['logoA']['data']['attributes']['url'] ?? '';
+    final logoB =
+        match['attributes']['logoB']['data']['attributes']['url'] ?? '';
     final matchTime = match['attributes']['matchTime'] ?? '00:00';
     final streamLink = match['attributes']['streamLink'] ?? '';
     final commentator = match['attributes']['commentator'] ?? '';
@@ -383,7 +396,8 @@ class MatchBox extends StatelessWidget {
     final now = DateTime.now();
     final matchDateTime = DateFormat('HH:mm').parse(matchTime);
     final matchTime12Hour = DateFormat('hh:mm a').format(matchDateTime);
-    final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
+    final matchDateTimeWithToday = DateTime(
+        now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
 
     final timeDifference = matchDateTimeWithToday.difference(now).inMinutes;
     String timeStatus;
@@ -420,7 +434,8 @@ class MatchBox extends StatelessWidget {
                       children: [
                         Image.network(logoA, width: 60, height: 60),
                         SizedBox(height: 5),
-                        Text(teamA, style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(teamA,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -432,7 +447,8 @@ class MatchBox extends StatelessWidget {
                     ),
                     child: Text(
                       timeStatus,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.white),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -441,7 +457,8 @@ class MatchBox extends StatelessWidget {
                       children: [
                         Image.network(logoB, width: 60, height: 60),
                         SizedBox(height: 5),
-                        Text(teamB, style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(teamB,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -628,9 +645,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             Center(
               child: _videoPlayerController.value.isInitialized
                   ? AspectRatio(
-                aspectRatio: _videoPlayerController.value.aspectRatio,
-                child: VideoPlayer(_videoPlayerController),
-              )
+                      aspectRatio: _videoPlayerController.value.aspectRatio,
+                      child: VideoPlayer(_videoPlayerController),
+                    )
                   : Container(color: Colors.black),
             ),
             if (_isControlsVisible)
@@ -642,7 +659,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(8)),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -658,11 +676,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               overlayColor: Colors.transparent,
                             ),
                             child: Slider(
-                              value: widget.isLive ? 0.0 : _videoPosition.inSeconds.toDouble(),
-                              max: widget.isLive ? 1.0 : _videoDuration.inSeconds.toDouble(),
+                              value: widget.isLive
+                                  ? 0.0
+                                  : _videoPosition.inSeconds.toDouble(),
+                              max: widget.isLive
+                                  ? 1.0
+                                  : _videoDuration.inSeconds.toDouble(),
                               onChanged: (value) {
                                 if (!widget.isLive) {
-                                  _videoPlayerController.seekTo(Duration(seconds: value.toInt()));
+                                  _videoPlayerController
+                                      .seekTo(Duration(seconds: value.toInt()));
                                 }
                               },
                               min: 0,
@@ -674,7 +697,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 alignment: Alignment.centerLeft,
                                 child: Container(
                                   height: 4,
-                                  width: (_videoBuffered.inSeconds.toDouble() / (_videoDuration.inSeconds.toDouble() == 0 ? 1 : _videoDuration.inSeconds.toDouble())) * MediaQuery.of(context).size.width,
+                                  width: (_videoBuffered.inSeconds.toDouble() /
+                                          (_videoDuration.inSeconds
+                                                      .toDouble() ==
+                                                  0
+                                              ? 1
+                                              : _videoDuration.inSeconds
+                                                  .toDouble())) *
+                                      MediaQuery.of(context).size.width,
                                   color: Colors.blue.withOpacity(0.5),
                                 ),
                               ),
@@ -684,13 +714,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 alignment: Alignment.centerLeft,
                                 child: Container(
                                   height: 4,
-                                  width: (_videoPosition.inSeconds.toDouble() / (_videoDuration.inSeconds.toDouble() == 0 ? 1 : _videoDuration.inSeconds.toDouble())) * MediaQuery.of(context).size.width,
+                                  width: (_videoPosition.inSeconds.toDouble() /
+                                          (_videoDuration.inSeconds
+                                                      .toDouble() ==
+                                                  0
+                                              ? 1
+                                              : _videoDuration.inSeconds
+                                                  .toDouble())) *
+                                      MediaQuery.of(context).size.width,
                                   color: Colors.white,
                                 ),
                               ),
                             ),
                             Positioned(
-                              left: (_videoPosition.inSeconds.toDouble() / (_videoDuration.inSeconds.toDouble() == 0 ? 1 : _videoDuration.inSeconds.toDouble())) * MediaQuery.of(context).size.width - 8,
+                              left: (_videoPosition.inSeconds.toDouble() /
+                                          (_videoDuration.inSeconds
+                                                      .toDouble() ==
+                                                  0
+                                              ? 1
+                                              : _videoDuration.inSeconds
+                                                  .toDouble())) *
+                                      MediaQuery.of(context).size.width -
+                                  8,
                               bottom: 15,
                               child: Container(
                                 height: 16,
@@ -720,7 +765,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           ),
                           IconButton(
                             icon: Icon(
-                              _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                              _isFullScreen
+                                  ? Icons.fullscreen_exit
+                                  : Icons.fullscreen,
                               color: Colors.white,
                             ),
                             onPressed: _toggleFullScreen,
@@ -738,10 +785,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
       floatingActionButton: _isFullScreen
           ? FloatingActionButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: Icon(Icons.arrow_back),
-        backgroundColor: Colors.black,
-      )
+              onPressed: () => Navigator.of(context).pop(),
+              child: Icon(Icons.arrow_back),
+              backgroundColor: Colors.black,
+            )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
