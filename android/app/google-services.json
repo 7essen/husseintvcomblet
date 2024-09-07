@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "909279787138",
+    "project_id": "notify-test-fd4ee",
+    "storage_bucket": "notify-test-fd4ee.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:909279787138:android:8a19ae52b34d92b908dc9b",
+        "android_client_info": {
+          "package_name": "com.hussein.tv1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCZ6t-KTCTkrddtnxYt_0tOeeHl05G6Dd0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

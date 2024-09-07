@@ -1,0 +1,22 @@
+#Mon Sep 02 03:24:45 EEST 2024
+base.0=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
+base.1=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeLibDexDebug\\0\\classes.dex
+base.2=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
+base.3=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\12\\classes.dex
+base.4=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\1\\classes.dex
+base.5=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\9\\classes.dex
+base.6=E\:\\flutterhere\\flutterproject\\husseintvtheori\\android\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes2.dex
+path.0=classes.dex
+path.1=0/classes.dex
+path.2=0/classes.dex
+path.3=12/classes.dex
+path.4=1/classes.dex
+path.5=9/classes.dex
+path.6=classes2.dex
+renamed.0=classes.dex
+renamed.1=classes2.dex
+renamed.2=classes3.dex
+renamed.3=classes4.dex
+renamed.4=classes5.dex
+renamed.5=classes6.dex
+renamed.6=classes7.dex

@@ -1,0 +1,20 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.hussein.tv.husseintv.app-mergeDebugResources-41:/values-hdpi-v4/values-hdpi-v4.xml",
+            "map": [
+                {
+                    "source": "E:\\.gradle\\caches\\transforms-3\\168b7298b30c2cc6c72862ecbfc2b4db\\transformed\\appcompat-1.2.0\\res\\values-hdpi-v4\\values-hdpi-v4.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "6",
+                        "endColumns": "13",
+                        "endOffsets": "327"
+                    }
+                }
+            ]
+        }
+    ]
+}
