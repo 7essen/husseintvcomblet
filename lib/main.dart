@@ -6,96 +6,11 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-import 'package:workmanager/workmanager.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  Workmanager().initialize(callbackDispatcher, isInDebugMode: true);
-  Workmanager().registerPeriodicTask(
-    "fetchApiTask",
-    "fetchApiTask",
-    frequency: Duration(minutes: 10),
-  );
   runApp(MyApp());
-}
-
-void callbackDispatcher() {
-  Workmanager().executeTask((task, inputData) async {
-    await fetchAllData();
-    return Future.value(true);
-  });
-}
-
-Future fetchAllData() async {
-  try {
-    final matchesResponse = await http
-        .get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
-    if (matchesResponse.statusCode == 200) {
-      final matchesData = json.decode(matchesResponse.body)['data'];
-      for (var match in matchesData) {
-        // تحقق من وقت المباراة وأرسل إشعارًا إذا كانت المباراة ستبدأ قريبًا
-        await scheduleMatchNotification(match);
-      }
-    }
-  } catch (e) {
-    print("Error fetching data: $e");
-  }
-}
-
-Future<void> scheduleMatchNotification(dynamic match) async {
-  final matchTime = match['attributes']['matchTime'] ?? '00:00';
-  final now = DateTime.now();
-  final matchDateTime = DateFormat('HH:mm').parse(matchTime);
-  final matchDateTimeWithToday = DateTime(
-      now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
-
-  // تحقق إذا كانت المباراة ستبدأ خلال 5 دقائق
-  if (matchDateTimeWithToday.isAfter(now) &&
-      matchDateTimeWithToday.isBefore(now.add(Duration(minutes: 5)))) {
-    FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-    var initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    var initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-    var androidPlatformChannelSpecifics = AndroidNotificationDetails(
-      'your_channel_id',
-      'your_channel_name',
-      channelDescription:
-          'your_channel_description', // استخدم channelDescription بدلاً من الوصف
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: false,
-    );
-
-    var platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      'تذكير',
-      'ستبدأ مباراة ${match['attributes']['teamA']} ضد ${match['attributes']['teamB']} قريبًا',
-      platformChannelSpecifics,
-      payload: 'item x',
-    );
-  }
-}
-
-void openVideo(BuildContext context, String? url) {
-  if (url != null && url.isNotEmpty) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(url: url),
-      ),
-    );
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('لا يوجد رابط للبث المباشر')),
-    );
-  }
 }
 
 class MyApp extends StatelessWidget {
@@ -129,57 +44,33 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  late Future<List> channelCategories;
-  late Future<List> newsArticles;
-  late Future<List> matches;
+  late Future<List<dynamic>> channelCategories;
+  late Future<List<dynamic>> newsArticles;
+  late Future<List<dynamic>> matches;
 
   @override
   void initState() {
     super.initState();
+    requestNotificationPermission();
     channelCategories = fetchChannelCategories();
     newsArticles = fetchNews();
     matches = fetchMatches();
+    checkForUpdate(context); // Check for updates on app start
   }
 
-  Future<List> fetchChannelCategories() async {
-    try {
-      final response = await http.get(Uri.parse(
-          'https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['data'] ?? [];
-      } else {
-        return [];
-      }
-    } catch (e) {
-      print("Error fetching channel categories: $e");
-      return [];
+  Future<void> requestNotificationPermission() async {
+    var status = await Permission.notification.status;
+    if (!status.isGranted) {
+      await Permission.notification.request();
     }
   }
 
-  Future<List> fetchNews() async {
+  Future<List<dynamic>> fetchMatches() async {
     try {
-      final response = await http
-          .get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
+      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['data'] ?? [];
-      } else {
-        return [];
-      }
-    } catch (e) {
-      print("Error fetching news: $e");
-      return [];
-    }
-  }
-
-  Future<List> fetchMatches() async {
-    try {
-      final response = await http.get(
-          Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['data'] ?? [];
+        return List.from(data['data'] ?? []);
       } else {
         return [];
       }
@@ -189,10 +80,81 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  Future<List<dynamic>> fetchChannelCategories() async {
+    try {
+      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List.from(data['data'] ?? []);
+      } else {
+        return [];
+      }
+    } catch (e) {
+      print("Error fetching channel categories: $e");
+      return [];
+    }
+  }
+
+  Future<List<dynamic>> fetchNews() async {
+    try {
+      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return List.from(data['data'] ?? []);
+      } else {
+        return [];
+      }
+    } catch (e) {
+      print("Error fetching news: $e");
+      return [];
+    }
+  }
+
+  Future<void> checkForUpdate(BuildContext context) async {
+    try {
+      final response = await http.get(Uri.parse('https://raw.githubusercontent.com/7essen/forceupdate/main/latestversion.json'));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final latestVersion = data['version'];
+        final updateUrl = data['update_url'];
+        const currentVersion = '1.0.0';
+        if (currentVersion != latestVersion) {
+          showUpdateDialog(context, updateUrl);
+        }
+      }
+    } catch (e) {
+      print("Error checking for update: $e");
+    }
+  }
+
+  void showUpdateDialog(BuildContext context, String updateUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevents dialog from being dismissed
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false, // Prevents back button from closing the dialog
+          child: AlertDialog(
+            title: Text('تحديث مطلوب'),
+            content: Text('يرجى تحديث التطبيق إلى أحدث إصدار.'),
+            actions: [
+              TextButton(
+                child: Text('تحديث الآن'),
+                onPressed: () async {
+                  try {
+                    await launch(updateUrl);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('فشل في فتح الرابط، لكن يمكنك نسخه: $updateUrl')),
+                    );
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -204,9 +166,9 @@ class _HomePageState extends State<HomePage> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          ChannelsSection(channelCategories: channelCategories),
+          ChannelsSection(channelCategories: channelCategories, openVideo: openVideo),
           NewsSection(newsArticles: newsArticles),
-          MatchesSection(matches: matches),
+          MatchesSection(matches: matches, openVideo: openVideo),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -225,20 +187,37 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
         currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
       ),
     );
+  }
+
+  void openVideo(BuildContext context, String? url) {
+    if (url != null && url.isNotEmpty) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => VideoPlayerScreen(url: url),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
+    }
   }
 }
 
 class ChannelsSection extends StatelessWidget {
-  final Future<List> channelCategories;
+  final Future<List<dynamic>> channelCategories;
+  final Function openVideo;
 
-  ChannelsSection({required this.channelCategories});
+  ChannelsSection({required this.channelCategories, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List>(
+    return FutureBuilder<List<dynamic>>(
       future: channelCategories,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -249,10 +228,11 @@ class ChannelsSection extends StatelessWidget {
           return Center(child: Text('لا توجد قنوات لعرضها'));
         } else {
           final categories = snapshot.data!;
+          categories.sort((a, b) => a['id'].compareTo(b['id']));
           return ListView.separated(
             itemCount: categories.length,
             itemBuilder: (context, index) {
-              return ChannelBox(category: categories[index]);
+              return ChannelBox(category: categories[index], openVideo: openVideo);
             },
             separatorBuilder: (context, index) => SizedBox(height: 16),
           );
@@ -261,11 +241,11 @@ class ChannelsSection extends StatelessWidget {
     );
   }
 }
-
 class ChannelBox extends StatelessWidget {
   final dynamic category;
+  final Function openVideo;
 
-  ChannelBox({required this.category});
+  ChannelBox({required this.category, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -285,8 +265,7 @@ class ChannelBox extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => CategoryChannelsScreen(
-                  channels: category['attributes']['channels']['data'] ?? []),
+              builder: (context) => CategoryChannelsScreen(channels: category['attributes']['channels']['data'] ?? [], openVideo: openVideo),
             ),
           );
         },
@@ -296,9 +275,10 @@ class ChannelBox extends StatelessWidget {
 }
 
 class CategoryChannelsScreen extends StatelessWidget {
-  final List channels;
+  final List<dynamic> channels;
+  final Function openVideo;
 
-  CategoryChannelsScreen({required this.channels});
+  CategoryChannelsScreen({required this.channels, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -309,7 +289,7 @@ class CategoryChannelsScreen extends StatelessWidget {
       body: ListView.separated(
         itemCount: channels.length,
         itemBuilder: (context, index) {
-          return ChannelTile(channel: channels[index]);
+          return ChannelTile(channel: channels[index], openVideo: openVideo);
         },
         separatorBuilder: (context, index) => SizedBox(height: 16),
       ),
@@ -319,8 +299,9 @@ class CategoryChannelsScreen extends StatelessWidget {
 
 class ChannelTile extends StatelessWidget {
   final dynamic channel;
+  final Function openVideo;
 
-  ChannelTile({required this.channel});
+  ChannelTile({required this.channel, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
@@ -346,13 +327,14 @@ class ChannelTile extends StatelessWidget {
 }
 
 class MatchesSection extends StatelessWidget {
-  final Future<List> matches;
+  final Future<List<dynamic>> matches;
+  final Function openVideo;
 
-  MatchesSection({required this.matches});
+  MatchesSection({required this.matches, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List>(
+    return FutureBuilder<List<dynamic>>(
       future: matches,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -363,11 +345,36 @@ class MatchesSection extends StatelessWidget {
           return Center(child: Text('لا توجد مباريات لعرضها'));
         } else {
           final matches = snapshot.data!;
-          return ListView.builder(
-            itemCount: matches.length,
-            itemBuilder: (context, index) {
-              return MatchBox(match: matches[index]);
-            },
+
+          // تقسيم المباريات إلى ثلاث مجموعات
+          List<dynamic> liveMatches = [];
+          List<dynamic> upcomingMatches = [];
+          List<dynamic> finishedMatches = [];
+
+          for (var match in matches) {
+            final matchDateTime = DateFormat('HH:mm').parse(match['attributes']['matchTime']);
+            if (matchDateTime.isBefore(DateTime.now()) && DateTime.now().isBefore(matchDateTime.add(Duration(minutes: 110)))) {
+              liveMatches.add(match);
+            } else if (matchDateTime.isAfter(DateTime.now())) {
+              upcomingMatches.add(match);
+            } else {
+              finishedMatches.add(match);
+            }
+          }
+
+          // ترتيب المباريات القادمة من الأقرب للأبعد
+          upcomingMatches.sort((a, b) {
+            final matchTimeA = DateFormat('HH:mm').parse(a['attributes']['matchTime']);
+            final matchTimeB = DateFormat('HH:mm').parse(b['attributes']['matchTime']);
+            return matchTimeA.compareTo(matchTimeB);
+          });
+
+          return ListView(
+            children: [
+              ...liveMatches.map((match) => MatchBox(match: match, openVideo: openVideo)).toList(),
+              ...upcomingMatches.map((match) => MatchBox(match: match, openVideo: openVideo)).toList(),
+              ...finishedMatches.map((match) => MatchBox(match: match, openVideo: openVideo)).toList(),
+            ],
           );
         }
       },
@@ -377,40 +384,35 @@ class MatchesSection extends StatelessWidget {
 
 class MatchBox extends StatelessWidget {
   final dynamic match;
+  final Function openVideo;
 
-  MatchBox({required this.match});
+  MatchBox({required this.match, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
     final teamA = match['attributes']['teamA'] ?? 'Team A';
     final teamB = match['attributes']['teamB'] ?? 'Team B';
-    final logoA =
-        match['attributes']['logoA']['data']['attributes']['url'] ?? '';
-    final logoB =
-        match['attributes']['logoB']['data']['attributes']['url'] ?? '';
+    final logoA = match['attributes']['logoA']['data']['attributes']['url'] ?? '';
+    final logoB = match['attributes']['logoB']['data']['attributes']['url'] ?? '';
     final matchTime = match['attributes']['matchTime'] ?? '00:00';
     final streamLink = match['attributes']['streamLink'] ?? '';
     final commentator = match['attributes']['commentator'] ?? '';
     final channel = match['attributes']['channel'] ?? '';
-
     final now = DateTime.now();
     final matchDateTime = DateFormat('HH:mm').parse(matchTime);
     final matchTime12Hour = DateFormat('hh:mm a').format(matchDateTime);
-    final matchDateTimeWithToday = DateTime(
-        now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
-
+    final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
     final timeDifference = matchDateTimeWithToday.difference(now).inMinutes;
+
     String timeStatus;
     Color borderColor;
 
     if (timeDifference < 0) {
-      if (now.isAfter(matchDateTimeWithToday.add(Duration(minutes: 110)))) {
-        timeStatus = 'انتهت المباراة';
-        borderColor = Colors.black;
-      } else {
-        timeStatus = 'مباشر';
-        borderColor = Colors.red;
-      }
+      timeStatus = 'انتهت المباراة';
+      borderColor = Colors.black;
+    } else if (timeDifference < 110) {
+      timeStatus = 'مباشر';
+      borderColor = Colors.red;
     } else {
       timeStatus = matchTime12Hour;
       borderColor = Colors.blueAccent;
@@ -434,8 +436,7 @@ class MatchBox extends StatelessWidget {
                       children: [
                         Image.network(logoA, width: 60, height: 60),
                         SizedBox(height: 5),
-                        Text(teamA,
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(teamA, style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -447,8 +448,7 @@ class MatchBox extends StatelessWidget {
                     ),
                     child: Text(
                       timeStatus,
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -457,8 +457,7 @@ class MatchBox extends StatelessWidget {
                       children: [
                         Image.network(logoB, width: 60, height: 60),
                         SizedBox(height: 5),
-                        Text(teamB,
-                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(teamB, style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -486,13 +485,13 @@ class MatchBox extends StatelessWidget {
 }
 
 class NewsSection extends StatelessWidget {
-  final Future<List> newsArticles;
+  final Future<List<dynamic>> newsArticles;
 
   NewsSection({required this.newsArticles});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List>(
+    return FutureBuilder<List<dynamic>>(
       future: newsArticles,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -524,42 +523,84 @@ class NewsBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-      child: ListTile(
-        contentPadding: EdgeInsets.all(10),
-        title: Text(
-          article['title'] ?? 'Unknown Title',
-          style: TextStyle(
-            color: Color(0xFF673ab7),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        subtitle: Column(
+    return GestureDetector(
+      onTap: () {
+        if (article['link'] != null && article['link'].isNotEmpty) {
+          _launchURL(article['link']);
+        }
+      },
+      child: Card(
+        margin: EdgeInsets.symmetric(horizontal: 5, vertical: 5),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(height: 10),
-            Image.network(article['image']['data']['attributes']['url']),
-            SizedBox(height: 10),
-            Text(article['content'] ?? 'No content available'),
-            SizedBox(height: 10),
-            Text(article['date'] ?? 'No date available'),
+            Image.network(
+              article['image']['data']['attributes']['url'],
+              width: double.infinity,
+              height: 280,
+              fit: BoxFit.cover,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    article['title'] ?? 'Unknown Title',
+                    style: TextStyle(
+                      color: Color(0xFF673ab7),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    article['content'] ?? 'No content available',
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        article['date'] != null
+                            ? DateFormat('yyyy-MM-dd').format(DateTime.parse(article['date']))
+                            : 'No date available',
+                        style: TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          if (article['link'] != null && article['link'].isNotEmpty) {
+                            _launchURL(article['link']);
+                          }
+                        },
+                        child: Text(
+                          'المزيد',
+                          style: TextStyle(
+                            color: Color(0xFF673ab7),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
-        onTap: () {
-          if (article['link'] != null && article['link'].isNotEmpty) {
-            _launchURL(article['link']);
-          }
-        },
       ),
     );
   }
 
   void _launchURL(String url) async {
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
+    try {
+      await launch(url, forceSafariVC: false, forceWebView: false);
+    } catch (e) {
+      print('Could not launch $url: $e');
+      // يمكنك هنا إضافة كود لفتح المتصفح بشكل يدوي إذا لزم الأمر
     }
   }
 }
@@ -645,9 +686,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             Center(
               child: _videoPlayerController.value.isInitialized
                   ? AspectRatio(
-                      aspectRatio: _videoPlayerController.value.aspectRatio,
-                      child: VideoPlayer(_videoPlayerController),
-                    )
+                aspectRatio: _videoPlayerController.value.aspectRatio,
+                child: VideoPlayer(_videoPlayerController),
+              )
                   : Container(color: Colors.black),
             ),
             if (_isControlsVisible)
@@ -660,7 +701,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
                     borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(8)),
+                    BorderRadius.vertical(top: Radius.circular(8)),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -698,12 +739,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 child: Container(
                                   height: 4,
                                   width: (_videoBuffered.inSeconds.toDouble() /
-                                          (_videoDuration.inSeconds
-                                                      .toDouble() ==
-                                                  0
-                                              ? 1
-                                              : _videoDuration.inSeconds
-                                                  .toDouble())) *
+                                      (_videoDuration.inSeconds
+                                          .toDouble() ==
+                                          0
+                                          ? 1
+                                          : _videoDuration.inSeconds
+                                          .toDouble())) *
                                       MediaQuery.of(context).size.width,
                                   color: Colors.blue.withOpacity(0.5),
                                 ),
@@ -715,12 +756,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 child: Container(
                                   height: 4,
                                   width: (_videoPosition.inSeconds.toDouble() /
-                                          (_videoDuration.inSeconds
-                                                      .toDouble() ==
-                                                  0
-                                              ? 1
-                                              : _videoDuration.inSeconds
-                                                  .toDouble())) *
+                                      (_videoDuration.inSeconds
+                                          .toDouble() ==
+                                          0
+                                          ? 1
+                                          : _videoDuration.inSeconds
+                                          .toDouble())) *
                                       MediaQuery.of(context).size.width,
                                   color: Colors.white,
                                 ),
@@ -728,13 +769,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                             Positioned(
                               left: (_videoPosition.inSeconds.toDouble() /
-                                          (_videoDuration.inSeconds
-                                                      .toDouble() ==
-                                                  0
-                                              ? 1
-                                              : _videoDuration.inSeconds
-                                                  .toDouble())) *
-                                      MediaQuery.of(context).size.width -
+                                  (_videoDuration.inSeconds
+                                      .toDouble() ==
+                                      0
+                                      ? 1
+                                      : _videoDuration.inSeconds
+                                      .toDouble())) *
+                                  MediaQuery.of(context).size.width -
                                   8,
                               bottom: 15,
                               child: Container(
@@ -785,10 +826,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
       floatingActionButton: _isFullScreen
           ? FloatingActionButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Icon(Icons.arrow_back),
-              backgroundColor: Colors.black,
-            )
+        onPressed: () => Navigator.of(context).pop(),
+        child: Icon(Icons.arrow_back),
+        backgroundColor: Colors.black,
+      )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
