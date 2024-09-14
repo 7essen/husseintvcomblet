@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:video_player/video_player.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
+import 'package:better_player/better_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +18,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '7eSen TV',
+      title: 'Hussein TV',
       theme: ThemeData(
         primaryColor: Color(0xFF512da8),
         scaffoldBackgroundColor: Color(0xFF673ab7),
@@ -168,7 +168,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('7eSen TV'),
+        title: Text('Hussein TV'),
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -670,131 +670,45 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VideoPlayerController _videoPlayerController;
-  bool _isControlsVisible = true;
-  bool _isFullScreen = false;
-
-  List<double> aspectRatios = [
-    16 / 9,
-    4 / 3,
-    18 / 9,
-    21 / 9
-  ]; // Available aspect ratios
-  int currentAspectRatioIndex = 0; // To keep track of the current aspect ratio
+  late BetterPlayerController _betterPlayerController;
 
   @override
   void initState() {
     super.initState();
-    _videoPlayerController = VideoPlayerController.network(widget.url)
-      ..initialize().then((_) {
-        setState(() {
-          _videoPlayerController.play();
-        });
-      })
-      ..addListener(() {
-        if (mounted) {
-          setState(() {
-            // Update play state
-          });
-        }
-      });
 
-    // Hide the status bar and navigation bar when entering full-screen mode
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    BetterPlayerDataSource betterPlayerDataSource = BetterPlayerDataSource(
+      BetterPlayerDataSourceType.network,
+      widget.url,
+      liveStream: widget.isLive,
+    );
+
+    _betterPlayerController = BetterPlayerController(
+      BetterPlayerConfiguration(
+        aspectRatio: 16 / 9,
+        autoPlay: true,
+        fullScreenByDefault: true,
+        controlsConfiguration: BetterPlayerControlsConfiguration(
+          enableFullscreen: true,
+          enablePlayPause: true,
+        ),
+      ),
+      betterPlayerDataSource: betterPlayerDataSource,
+    );
   }
 
   @override
   void dispose() {
-    _videoPlayerController.dispose();
-    // Restore the system UI when exiting the video player
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _betterPlayerController.dispose();
     super.dispose();
-  }
-
-  void _toggleControlsVisibility() {
-    setState(() {
-      _isControlsVisible = !_isControlsVisible;
-    });
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      if (_videoPlayerController.value.isPlaying) {
-        _videoPlayerController.pause();
-      } else {
-        _videoPlayerController.play();
-      }
-    });
-  }
-
-  void _toggleAspectRatio() {
-    setState(() {
-      // Change the current aspect ratio to the next one in the list
-      currentAspectRatioIndex =
-          (currentAspectRatioIndex + 1) % aspectRatios.length;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTap: _toggleControlsVisibility,
-        child: Stack(
-          children: [
-            Center(
-              child: _videoPlayerController.value.isInitialized
-                  ? AspectRatio(
-                      aspectRatio: aspectRatios[
-                          currentAspectRatioIndex], // Use the changing aspect ratio
-                      child: VideoPlayer(_videoPlayerController),
-                    )
-                  : Container(color: Colors.black),
-            ),
-            if (_isControlsVisible)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(8)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: Icon(
-                          _videoPlayerController.value.isPlaying
-                              ? Icons.pause
-                              : Icons.play_arrow,
-                          color: Colors.white,
-                        ),
-                        onPressed: _togglePlayPause,
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.aspect_ratio, color: Colors.white),
-                        onPressed: _toggleAspectRatio,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
+      body: BetterPlayer(
+        controller: _betterPlayerController,
       ),
-      floatingActionButton: _isFullScreen
-          ? FloatingActionButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Icon(Icons.arrow_back),
-              backgroundColor: Colors.black,
-            )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 }

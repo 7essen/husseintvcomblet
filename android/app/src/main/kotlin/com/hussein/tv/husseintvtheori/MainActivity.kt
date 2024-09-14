@@ -1,4 +1,4 @@
-package com.hussein.tv1
+package com.hussein.tvplayer
 
 import io.flutter.embedding.android.FlutterActivity
 
