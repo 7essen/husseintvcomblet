@@ -60,7 +60,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '909279787138',
     projectId: 'notify-test-fd4ee',
     storageBucket: 'notify-test-fd4ee.appspot.com',
-    iosBundleId: 'com.hussein.tv.husseintvtheori',
+    iosBundleId: 'com.hussein.tvplayer',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

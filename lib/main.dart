@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:video_player/video_player.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
+import 'package:better_player/better_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,9 +45,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  late Future<List<dynamic>> channelCategories;
-  late Future<List<dynamic>> newsArticles;
-  late Future<List<dynamic>> matches;
+  late Future<List> channelCategories;
+  late Future<List> newsArticles;
+  late Future<List> matches;
 
   @override
   void initState() {
@@ -55,7 +56,7 @@ class _HomePageState extends State<HomePage> {
     channelCategories = fetchChannelCategories();
     newsArticles = fetchNews();
     matches = fetchMatches();
-    checkForUpdate(context); // Check for updates on app start
+    checkForUpdate(context);
   }
 
   Future<void> requestNotificationPermission() async {
@@ -65,7 +66,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<dynamic>> fetchMatches() async {
+  Future<List> fetchMatches() async {
     try {
       final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
       if (response.statusCode == 200) {
@@ -80,7 +81,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<dynamic>> fetchChannelCategories() async {
+  Future<List> fetchChannelCategories() async {
     try {
       final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
       if (response.statusCode == 200) {
@@ -95,7 +96,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<dynamic>> fetchNews() async {
+  Future<List> fetchNews() async {
     try {
       final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
       if (response.statusCode == 200) {
@@ -130,10 +131,10 @@ class _HomePageState extends State<HomePage> {
   void showUpdateDialog(BuildContext context, String updateUrl) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevents dialog from being dismissed
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return WillPopScope(
-          onWillPop: () async => false, // Prevents back button from closing the dialog
+          onWillPop: () async => false,
           child: AlertDialog(
             title: Text('تحديث مطلوب'),
             content: Text('يرجى تحديث التطبيق إلى أحدث إصدار.'),
@@ -210,14 +211,14 @@ class _HomePageState extends State<HomePage> {
 }
 
 class ChannelsSection extends StatelessWidget {
-  final Future<List<dynamic>> channelCategories;
+  final Future<List> channelCategories;
   final Function openVideo;
 
   ChannelsSection({required this.channelCategories, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List>(
       future: channelCategories,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -241,6 +242,7 @@ class ChannelsSection extends StatelessWidget {
     );
   }
 }
+
 class ChannelBox extends StatelessWidget {
   final dynamic category;
   final Function openVideo;
@@ -265,7 +267,10 @@ class ChannelBox extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => CategoryChannelsScreen(channels: category['attributes']['channels']['data'] ?? [], openVideo: openVideo),
+              builder: (context) => CategoryChannelsScreen(
+                channels: category['attributes']['channels']['data'] ?? [],
+                openVideo: openVideo,
+              ),
             ),
           );
         },
@@ -275,7 +280,7 @@ class ChannelBox extends StatelessWidget {
 }
 
 class CategoryChannelsScreen extends StatelessWidget {
-  final List<dynamic> channels;
+  final List channels;
   final Function openVideo;
 
   CategoryChannelsScreen({required this.channels, required this.openVideo});
@@ -327,14 +332,14 @@ class ChannelTile extends StatelessWidget {
 }
 
 class MatchesSection extends StatelessWidget {
-  final Future<List<dynamic>> matches;
+  final Future<List> matches;
   final Function openVideo;
 
   MatchesSection({required this.matches, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List>(
       future: matches,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -346,16 +351,21 @@ class MatchesSection extends StatelessWidget {
         } else {
           final matches = snapshot.data!;
 
-          // تقسيم المباريات إلى ثلاث مجموعات
-          List<dynamic> liveMatches = [];
-          List<dynamic> upcomingMatches = [];
-          List<dynamic> finishedMatches = [];
+          List liveMatches = [];
+          List upcomingMatches = [];
+          List finishedMatches = [];
 
           for (var match in matches) {
+            // تحقق من أن match ليس null وأنه يحتوي على attributes
+            if (match == null || match['attributes'] == null) continue;
+
             final matchDateTime = DateFormat('HH:mm').parse(match['attributes']['matchTime']);
-            if (matchDateTime.isBefore(DateTime.now()) && DateTime.now().isBefore(matchDateTime.add(Duration(minutes: 110)))) {
+            final now = DateTime.now();
+            final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
+
+            if (matchDateTimeWithToday.isBefore(now) && now.isBefore(matchDateTimeWithToday.add(Duration(minutes: 110))) ) {
               liveMatches.add(match);
-            } else if (matchDateTime.isAfter(DateTime.now())) {
+            } else if (matchDateTimeWithToday.isAfter(now)) {
               upcomingMatches.add(match);
             } else {
               finishedMatches.add(match);
@@ -390,6 +400,11 @@ class MatchBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // تحقق من أن match ليس null وأنه يحتوي على attributes
+    if (match == null || match['attributes'] == null) {
+      return SizedBox.shrink(); // عرض مساحة فارغة إذا كانت البيانات غير متاحة
+    }
+
     final teamA = match['attributes']['teamA'] ?? 'Team A';
     final teamB = match['attributes']['teamB'] ?? 'Team B';
     final logoA = match['attributes']['logoA']['data']['attributes']['url'] ?? '';
@@ -398,29 +413,34 @@ class MatchBox extends StatelessWidget {
     final streamLink = match['attributes']['streamLink'] ?? '';
     final commentator = match['attributes']['commentator'] ?? '';
     final channel = match['attributes']['channel'] ?? '';
-    final now = DateTime.now();
-    final matchDateTime = DateFormat('HH:mm').parse(matchTime);
-    final matchTime12Hour = DateFormat('hh:mm a').format(matchDateTime);
-    final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
-    final timeDifference = matchDateTimeWithToday.difference(now).inMinutes;
 
+    // الحصول على الوقت الحالي بتوقيت السعودية (UTC+3)
+    DateTime now = DateTime.now().toUtc().add(Duration(hours: 0));
+    final matchDateTime = DateFormat('HH:mm').parse(matchTime);
+    final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
+
+    // تحديد حالة المباراة
     String timeStatus;
     Color borderColor;
 
-    if (timeDifference < 0) {
-      timeStatus = 'انتهت المباراة';
-      borderColor = Colors.black;
-    } else if (timeDifference < 110) {
-      timeStatus = 'مباشر';
+    if (matchDateTimeWithToday.isBefore(now) && now.isBefore(matchDateTimeWithToday.add(Duration(minutes: 110)))) {
+      timeStatus = 'مباشر'; // يظهر "مباشر" عندما يبدأ الوقت
       borderColor = Colors.red;
+    } else if (now.isAfter(matchDateTimeWithToday.add(Duration(minutes: 110)))) {
+      timeStatus = 'انتهت المباراة'; // يظهر "انتهت المباراة" بعد 110 دقائق
+      borderColor = Colors.black;
     } else {
-      timeStatus = matchTime12Hour;
+      timeStatus = DateFormat('hh:mm a').format(matchDateTimeWithToday); // عرض الوقت
       borderColor = Colors.blueAccent;
     }
 
     return GestureDetector(
       onTap: () {
-        openVideo(context, streamLink);
+        if (streamLink != null && streamLink.isNotEmpty) {
+          openVideo(context, streamLink);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
+        }
       },
       child: Card(
         margin: EdgeInsets.all(10),
@@ -484,14 +504,17 @@ class MatchBox extends StatelessWidget {
   }
 }
 
+
+
+
 class NewsSection extends StatelessWidget {
-  final Future<List<dynamic>> newsArticles;
+  final Future<List> newsArticles;
 
   NewsSection({required this.newsArticles});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List>(
       future: newsArticles,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -565,9 +588,7 @@ class NewsBox extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        article['date'] != null
-                            ? DateFormat('yyyy-MM-dd').format(DateTime.parse(article['date']))
-                            : 'No date available',
+                        article['date'] != null ? DateFormat('yyyy-MM-dd').format(DateTime.parse(article['date'])) : 'No date available',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       GestureDetector(
@@ -601,6 +622,7 @@ class NewsBox extends StatelessWidget {
     } catch (e) {
       print('Could not launch $url: $e');
       // يمكنك هنا إضافة كود لفتح المتصفح بشكل يدوي إذا لزم الأمر
+      // مثل استخدام launch('https://www.google.com') كبديل
     }
   }
 }
@@ -616,222 +638,45 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VideoPlayerController _videoPlayerController;
-  bool _isControlsVisible = true;
-  bool _isFullScreen = false;
-  Duration _videoDuration = Duration.zero;
-  Duration _videoPosition = Duration.zero;
-  Duration _videoBuffered = Duration.zero;
+  late BetterPlayerController _betterPlayerController;
 
   @override
   void initState() {
     super.initState();
-    _videoPlayerController = VideoPlayerController.network(widget.url)
-      ..initialize().then((_) {
-        setState(() {
-          _videoDuration = _videoPlayerController.value.duration;
-          _videoBuffered = Duration.zero;
-          _videoPosition = _videoPlayerController.value.position;
-        });
-        _videoPlayerController.play();
-        _videoPlayerController.addListener(() {
-          if (mounted) {
-            setState(() {
-              _videoPosition = _videoPlayerController.value.position;
-              _videoBuffered = _videoPlayerController.value.buffered.isNotEmpty
-                  ? _videoPlayerController.value.buffered.last.end
-                  : Duration.zero;
-            });
-          }
-        });
-      });
+
+    BetterPlayerDataSource betterPlayerDataSource = BetterPlayerDataSource(
+      BetterPlayerDataSourceType.network,
+      widget.url,
+      liveStream: widget.isLive,
+    );
+
+    _betterPlayerController = BetterPlayerController(
+      BetterPlayerConfiguration(
+        aspectRatio: 16 / 9,
+        autoPlay: true,
+        fullScreenByDefault: true,
+        controlsConfiguration: BetterPlayerControlsConfiguration(
+          enableFullscreen: true,
+          enablePlayPause: true,
+        ),
+      ),
+      betterPlayerDataSource: betterPlayerDataSource,
+    );
   }
 
   @override
   void dispose() {
-    _videoPlayerController.dispose();
+    _betterPlayerController.dispose();
     super.dispose();
-  }
-
-  void _toggleControlsVisibility() {
-    setState(() {
-      _isControlsVisible = !_isControlsVisible;
-    });
-  }
-
-  void _togglePlayPause() {
-    setState(() {
-      if (_videoPlayerController.value.isPlaying) {
-        _videoPlayerController.pause();
-      } else {
-        _videoPlayerController.play();
-      }
-    });
-  }
-
-  void _toggleFullScreen() {
-    setState(() {
-      _isFullScreen = !_isFullScreen;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTap: _toggleControlsVisibility,
-        child: Stack(
-          children: [
-            Center(
-              child: _videoPlayerController.value.isInitialized
-                  ? AspectRatio(
-                aspectRatio: _videoPlayerController.value.aspectRatio,
-                child: VideoPlayer(_videoPlayerController),
-              )
-                  : Container(color: Colors.black),
-            ),
-            if (_isControlsVisible)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(8)),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Stack(
-                        children: [
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 4,
-                              activeTrackColor: Colors.transparent,
-                              inactiveTrackColor: Colors.transparent,
-                              thumbColor: Colors.transparent,
-                              overlayColor: Colors.transparent,
-                            ),
-                            child: Slider(
-                              value: widget.isLive
-                                  ? 0.0
-                                  : _videoPosition.inSeconds.toDouble(),
-                              max: widget.isLive
-                                  ? 1.0
-                                  : _videoDuration.inSeconds.toDouble(),
-                              onChanged: (value) {
-                                if (!widget.isLive) {
-                                  _videoPlayerController
-                                      .seekTo(Duration(seconds: value.toInt()));
-                                }
-                              },
-                              min: 0,
-                            ),
-                          ),
-                          if (!widget.isLive) ...[
-                            Positioned.fill(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  height: 4,
-                                  width: (_videoBuffered.inSeconds.toDouble() /
-                                      (_videoDuration.inSeconds
-                                          .toDouble() ==
-                                          0
-                                          ? 1
-                                          : _videoDuration.inSeconds
-                                          .toDouble())) *
-                                      MediaQuery.of(context).size.width,
-                                  color: Colors.blue.withOpacity(0.5),
-                                ),
-                              ),
-                            ),
-                            Positioned.fill(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  height: 4,
-                                  width: (_videoPosition.inSeconds.toDouble() /
-                                      (_videoDuration.inSeconds
-                                          .toDouble() ==
-                                          0
-                                          ? 1
-                                          : _videoDuration.inSeconds
-                                          .toDouble())) *
-                                      MediaQuery.of(context).size.width,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              left: (_videoPosition.inSeconds.toDouble() /
-                                  (_videoDuration.inSeconds
-                                      .toDouble() ==
-                                      0
-                                      ? 1
-                                      : _videoDuration.inSeconds
-                                      .toDouble())) *
-                                  MediaQuery.of(context).size.width -
-                                  8,
-                              bottom: 15,
-                              child: Container(
-                                height: 16,
-                                width: 16,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              _videoPlayerController.value.isPlaying
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                              color: Colors.white,
-                            ),
-                            onPressed: _togglePlayPause,
-                            splashColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _isFullScreen
-                                  ? Icons.fullscreen_exit
-                                  : Icons.fullscreen,
-                              color: Colors.white,
-                            ),
-                            onPressed: _toggleFullScreen,
-                            splashColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        ),
+      body: BetterPlayer(
+        controller: _betterPlayerController,
       ),
-      floatingActionButton: _isFullScreen
-          ? FloatingActionButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: Icon(Icons.arrow_back),
-        backgroundColor: Colors.black,
-      )
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 }

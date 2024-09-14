@@ -8,7 +8,7 @@
 PRODUCT_NAME = husseintvtheori
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.hussein.tv.husseintvtheori
+PRODUCT_BUNDLE_IDENTIFIER = com.hussein.tvplayer
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2024 com.hussein.tv. All rights reserved.
