@@ -60,7 +60,7 @@
 38-->[androidx.core:core:1.13.1] E:\.gradle\caches\transforms-3\425e0d43938c7c537acdac2636dbb926\transformed\core-1.13.1\AndroidManifest.xml:28:18-86
 39        android:debuggable="true"
 40        android:icon="@mipmap/ic_launcher"
-41        android:label="Hussein TV" >
+41        android:label="7eSen TV" >
 42        <activity
 43            android:name="com.hussein.tv.husseintv.MainActivity"
 44            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"

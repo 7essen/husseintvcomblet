@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,7 +18,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Hussein TV',
+      title: '7eSen TV',
       theme: ThemeData(
         primaryColor: Color(0xFF512da8),
         scaffoldBackgroundColor: Color(0xFF673ab7),
@@ -44,9 +45,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
-  late Future<List<dynamic>> channelCategories;
-  late Future<List<dynamic>> newsArticles;
-  late Future<List<dynamic>> matches;
+  late Future<List> channelCategories;
+  late Future<List> newsArticles;
+  late Future<List> matches;
 
   @override
   void initState() {
@@ -55,7 +56,7 @@ class _HomePageState extends State<HomePage> {
     channelCategories = fetchChannelCategories();
     newsArticles = fetchNews();
     matches = fetchMatches();
-    checkForUpdate(context); // Check for updates on app start
+    checkForUpdate(context);
   }
 
   Future<void> requestNotificationPermission() async {
@@ -65,9 +66,10 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<dynamic>> fetchMatches() async {
+  Future<List> fetchMatches() async {
     try {
-      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
+      final response = await http.get(
+          Uri.parse('https://st2-5jox.onrender.com/api/matches?populate=*'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return List.from(data['data'] ?? []);
@@ -80,9 +82,10 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<dynamic>> fetchChannelCategories() async {
+  Future<List> fetchChannelCategories() async {
     try {
-      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
+      final response = await http.get(Uri.parse(
+          'https://st2-5jox.onrender.com/api/channel-categories?populate=channels'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return List.from(data['data'] ?? []);
@@ -95,9 +98,10 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<List<dynamic>> fetchNews() async {
+  Future<List> fetchNews() async {
     try {
-      final response = await http.get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
+      final response = await http
+          .get(Uri.parse('https://st2-5jox.onrender.com/api/news?populate=*'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return List.from(data['data'] ?? []);
@@ -112,7 +116,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> checkForUpdate(BuildContext context) async {
     try {
-      final response = await http.get(Uri.parse('https://raw.githubusercontent.com/7essen/forceupdate/main/latestversion.json'));
+      final response = await http.get(Uri.parse(
+          'https://raw.githubusercontent.com/7essen/forceupdate/main/latestversion.json'));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final latestVersion = data['version'];
@@ -130,10 +135,10 @@ class _HomePageState extends State<HomePage> {
   void showUpdateDialog(BuildContext context, String updateUrl) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Prevents dialog from being dismissed
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return WillPopScope(
-          onWillPop: () async => false, // Prevents back button from closing the dialog
+          onWillPop: () async => false,
           child: AlertDialog(
             title: Text('تحديث مطلوب'),
             content: Text('يرجى تحديث التطبيق إلى أحدث إصدار.'),
@@ -145,7 +150,9 @@ class _HomePageState extends State<HomePage> {
                     await launch(updateUrl);
                   } catch (e) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('فشل في فتح الرابط، لكن يمكنك نسخه: $updateUrl')),
+                      SnackBar(
+                          content: Text(
+                              'فشل في فتح الرابط، لكن يمكنك نسخه: $updateUrl')),
                     );
                   }
                 },
@@ -161,12 +168,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Hussein TV'),
+        title: Text('7eSen TV'),
       ),
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          ChannelsSection(channelCategories: channelCategories, openVideo: openVideo),
+          ChannelsSection(
+              channelCategories: channelCategories, openVideo: openVideo),
           NewsSection(newsArticles: newsArticles),
           MatchesSection(matches: matches, openVideo: openVideo),
         ],
@@ -204,20 +212,21 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
     }
   }
 }
 
 class ChannelsSection extends StatelessWidget {
-  final Future<List<dynamic>> channelCategories;
+  final Future<List> channelCategories;
   final Function openVideo;
 
   ChannelsSection({required this.channelCategories, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List>(
       future: channelCategories,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -232,7 +241,8 @@ class ChannelsSection extends StatelessWidget {
           return ListView.separated(
             itemCount: categories.length,
             itemBuilder: (context, index) {
-              return ChannelBox(category: categories[index], openVideo: openVideo);
+              return ChannelBox(
+                  category: categories[index], openVideo: openVideo);
             },
             separatorBuilder: (context, index) => SizedBox(height: 16),
           );
@@ -241,6 +251,7 @@ class ChannelsSection extends StatelessWidget {
     );
   }
 }
+
 class ChannelBox extends StatelessWidget {
   final dynamic category;
   final Function openVideo;
@@ -265,7 +276,10 @@ class ChannelBox extends StatelessWidget {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => CategoryChannelsScreen(channels: category['attributes']['channels']['data'] ?? [], openVideo: openVideo),
+              builder: (context) => CategoryChannelsScreen(
+                channels: category['attributes']['channels']['data'] ?? [],
+                openVideo: openVideo,
+              ),
             ),
           );
         },
@@ -275,7 +289,7 @@ class ChannelBox extends StatelessWidget {
 }
 
 class CategoryChannelsScreen extends StatelessWidget {
-  final List<dynamic> channels;
+  final List channels;
   final Function openVideo;
 
   CategoryChannelsScreen({required this.channels, required this.openVideo});
@@ -327,14 +341,14 @@ class ChannelTile extends StatelessWidget {
 }
 
 class MatchesSection extends StatelessWidget {
-  final Future<List<dynamic>> matches;
+  final Future<List> matches;
   final Function openVideo;
 
   MatchesSection({required this.matches, required this.openVideo});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List>(
       future: matches,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -346,16 +360,25 @@ class MatchesSection extends StatelessWidget {
         } else {
           final matches = snapshot.data!;
 
-          // تقسيم المباريات إلى ثلاث مجموعات
-          List<dynamic> liveMatches = [];
-          List<dynamic> upcomingMatches = [];
-          List<dynamic> finishedMatches = [];
+          List liveMatches = [];
+          List upcomingMatches = [];
+          List finishedMatches = [];
 
           for (var match in matches) {
-            final matchDateTime = DateFormat('HH:mm').parse(match['attributes']['matchTime']);
-            if (matchDateTime.isBefore(DateTime.now()) && DateTime.now().isBefore(matchDateTime.add(Duration(minutes: 110)))) {
+            // تحقق من أن match ليس null وأنه يحتوي على attributes
+            if (match == null || match['attributes'] == null) continue;
+
+            final matchDateTime =
+                DateFormat('HH:mm').parse(match['attributes']['matchTime']);
+            final now = DateTime.now();
+            final matchDateTimeWithToday = DateTime(now.year, now.month,
+                now.day, matchDateTime.hour, matchDateTime.minute);
+
+            if (matchDateTimeWithToday.isBefore(now) &&
+                now.isBefore(
+                    matchDateTimeWithToday.add(Duration(minutes: 110)))) {
               liveMatches.add(match);
-            } else if (matchDateTime.isAfter(DateTime.now())) {
+            } else if (matchDateTimeWithToday.isAfter(now)) {
               upcomingMatches.add(match);
             } else {
               finishedMatches.add(match);
@@ -364,16 +387,24 @@ class MatchesSection extends StatelessWidget {
 
           // ترتيب المباريات القادمة من الأقرب للأبعد
           upcomingMatches.sort((a, b) {
-            final matchTimeA = DateFormat('HH:mm').parse(a['attributes']['matchTime']);
-            final matchTimeB = DateFormat('HH:mm').parse(b['attributes']['matchTime']);
+            final matchTimeA =
+                DateFormat('HH:mm').parse(a['attributes']['matchTime']);
+            final matchTimeB =
+                DateFormat('HH:mm').parse(b['attributes']['matchTime']);
             return matchTimeA.compareTo(matchTimeB);
           });
 
           return ListView(
             children: [
-              ...liveMatches.map((match) => MatchBox(match: match, openVideo: openVideo)).toList(),
-              ...upcomingMatches.map((match) => MatchBox(match: match, openVideo: openVideo)).toList(),
-              ...finishedMatches.map((match) => MatchBox(match: match, openVideo: openVideo)).toList(),
+              ...liveMatches
+                  .map((match) => MatchBox(match: match, openVideo: openVideo))
+                  .toList(),
+              ...upcomingMatches
+                  .map((match) => MatchBox(match: match, openVideo: openVideo))
+                  .toList(),
+              ...finishedMatches
+                  .map((match) => MatchBox(match: match, openVideo: openVideo))
+                  .toList(),
             ],
           );
         }
@@ -390,37 +421,54 @@ class MatchBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // تحقق من أن match ليس null وأنه يحتوي على attributes
+    if (match == null || match['attributes'] == null) {
+      return SizedBox.shrink(); // عرض مساحة فارغة إذا كانت البيانات غير متاحة
+    }
+
     final teamA = match['attributes']['teamA'] ?? 'Team A';
     final teamB = match['attributes']['teamB'] ?? 'Team B';
-    final logoA = match['attributes']['logoA']['data']['attributes']['url'] ?? '';
-    final logoB = match['attributes']['logoB']['data']['attributes']['url'] ?? '';
+    final logoA =
+        match['attributes']['logoA']['data']['attributes']['url'] ?? '';
+    final logoB =
+        match['attributes']['logoB']['data']['attributes']['url'] ?? '';
     final matchTime = match['attributes']['matchTime'] ?? '00:00';
     final streamLink = match['attributes']['streamLink'] ?? '';
     final commentator = match['attributes']['commentator'] ?? '';
     final channel = match['attributes']['channel'] ?? '';
-    final now = DateTime.now();
-    final matchDateTime = DateFormat('HH:mm').parse(matchTime);
-    final matchTime12Hour = DateFormat('hh:mm a').format(matchDateTime);
-    final matchDateTimeWithToday = DateTime(now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
-    final timeDifference = matchDateTimeWithToday.difference(now).inMinutes;
 
+    // الحصول على الوقت الحالي بتوقيت السعودية (UTC+3)
+    DateTime now = DateTime.now().toUtc().add(Duration(hours: 0));
+    final matchDateTime = DateFormat('HH:mm').parse(matchTime);
+    final matchDateTimeWithToday = DateTime(
+        now.year, now.month, now.day, matchDateTime.hour, matchDateTime.minute);
+
+    // تحديد حالة المباراة
     String timeStatus;
     Color borderColor;
 
-    if (timeDifference < 0) {
-      timeStatus = 'انتهت المباراة';
-      borderColor = Colors.black;
-    } else if (timeDifference < 110) {
-      timeStatus = 'مباشر';
+    if (matchDateTimeWithToday.isBefore(now) &&
+        now.isBefore(matchDateTimeWithToday.add(Duration(minutes: 110)))) {
+      timeStatus = 'مباشر'; // يظهر "مباشر" عندما يبدأ الوقت
       borderColor = Colors.red;
+    } else if (now
+        .isAfter(matchDateTimeWithToday.add(Duration(minutes: 110)))) {
+      timeStatus = 'انتهت المباراة'; // يظهر "انتهت المباراة" بعد 110 دقائق
+      borderColor = Colors.black;
     } else {
-      timeStatus = matchTime12Hour;
+      timeStatus =
+          DateFormat('hh:mm a').format(matchDateTimeWithToday); // عرض الوقت
       borderColor = Colors.blueAccent;
     }
 
     return GestureDetector(
       onTap: () {
-        openVideo(context, streamLink);
+        if (streamLink != null && streamLink.isNotEmpty) {
+          openVideo(context, streamLink);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('لا يوجد رابط للبث المباشر')));
+        }
       },
       child: Card(
         margin: EdgeInsets.all(10),
@@ -436,7 +484,8 @@ class MatchBox extends StatelessWidget {
                       children: [
                         Image.network(logoA, width: 60, height: 60),
                         SizedBox(height: 5),
-                        Text(teamA, style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(teamA,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -448,7 +497,8 @@ class MatchBox extends StatelessWidget {
                     ),
                     child: Text(
                       timeStatus,
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, color: Colors.white),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -457,7 +507,8 @@ class MatchBox extends StatelessWidget {
                       children: [
                         Image.network(logoB, width: 60, height: 60),
                         SizedBox(height: 5),
-                        Text(teamB, style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text(teamB,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -485,13 +536,13 @@ class MatchBox extends StatelessWidget {
 }
 
 class NewsSection extends StatelessWidget {
-  final Future<List<dynamic>> newsArticles;
+  final Future<List> newsArticles;
 
   NewsSection({required this.newsArticles});
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<List>(
       future: newsArticles,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -566,13 +617,15 @@ class NewsBox extends StatelessWidget {
                     children: [
                       Text(
                         article['date'] != null
-                            ? DateFormat('yyyy-MM-dd').format(DateTime.parse(article['date']))
+                            ? DateFormat('yyyy-MM-dd')
+                                .format(DateTime.parse(article['date']))
                             : 'No date available',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                       GestureDetector(
                         onTap: () {
-                          if (article['link'] != null && article['link'].isNotEmpty) {
+                          if (article['link'] != null &&
+                              article['link'].isNotEmpty) {
                             _launchURL(article['link']);
                           }
                         },
@@ -601,6 +654,7 @@ class NewsBox extends StatelessWidget {
     } catch (e) {
       print('Could not launch $url: $e');
       // يمكنك هنا إضافة كود لفتح المتصفح بشكل يدوي إذا لزم الأمر
+      // مثل استخدام launch('https://www.google.com') كبديل
     }
   }
 }
@@ -619,9 +673,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late VideoPlayerController _videoPlayerController;
   bool _isControlsVisible = true;
   bool _isFullScreen = false;
-  Duration _videoDuration = Duration.zero;
-  Duration _videoPosition = Duration.zero;
-  Duration _videoBuffered = Duration.zero;
+
+  List<double> aspectRatios = [
+    16 / 9,
+    4 / 3,
+    18 / 9,
+    21 / 9
+  ]; // Available aspect ratios
+  int currentAspectRatioIndex = 0; // To keep track of the current aspect ratio
 
   @override
   void initState() {
@@ -629,27 +688,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _videoPlayerController = VideoPlayerController.network(widget.url)
       ..initialize().then((_) {
         setState(() {
-          _videoDuration = _videoPlayerController.value.duration;
-          _videoBuffered = Duration.zero;
-          _videoPosition = _videoPlayerController.value.position;
+          _videoPlayerController.play();
         });
-        _videoPlayerController.play();
-        _videoPlayerController.addListener(() {
-          if (mounted) {
-            setState(() {
-              _videoPosition = _videoPlayerController.value.position;
-              _videoBuffered = _videoPlayerController.value.buffered.isNotEmpty
-                  ? _videoPlayerController.value.buffered.last.end
-                  : Duration.zero;
-            });
-          }
-        });
+      })
+      ..addListener(() {
+        if (mounted) {
+          setState(() {
+            // Update play state
+          });
+        }
       });
+
+    // Hide the status bar and navigation bar when entering full-screen mode
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     _videoPlayerController.dispose();
+    // Restore the system UI when exiting the video player
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -669,9 +727,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
-  void _toggleFullScreen() {
+  void _toggleAspectRatio() {
     setState(() {
-      _isFullScreen = !_isFullScreen;
+      // Change the current aspect ratio to the next one in the list
+      currentAspectRatioIndex =
+          (currentAspectRatioIndex + 1) % aspectRatios.length;
     });
   }
 
@@ -686,9 +746,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             Center(
               child: _videoPlayerController.value.isInitialized
                   ? AspectRatio(
-                aspectRatio: _videoPlayerController.value.aspectRatio,
-                child: VideoPlayer(_videoPlayerController),
-              )
+                      aspectRatio: aspectRatios[
+                          currentAspectRatioIndex], // Use the changing aspect ratio
+                      child: VideoPlayer(_videoPlayerController),
+                    )
                   : Container(color: Colors.black),
             ),
             if (_isControlsVisible)
@@ -701,121 +762,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
                     borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(8)),
+                        BorderRadius.vertical(top: Radius.circular(8)),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Stack(
-                        children: [
-                          SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 4,
-                              activeTrackColor: Colors.transparent,
-                              inactiveTrackColor: Colors.transparent,
-                              thumbColor: Colors.transparent,
-                              overlayColor: Colors.transparent,
-                            ),
-                            child: Slider(
-                              value: widget.isLive
-                                  ? 0.0
-                                  : _videoPosition.inSeconds.toDouble(),
-                              max: widget.isLive
-                                  ? 1.0
-                                  : _videoDuration.inSeconds.toDouble(),
-                              onChanged: (value) {
-                                if (!widget.isLive) {
-                                  _videoPlayerController
-                                      .seekTo(Duration(seconds: value.toInt()));
-                                }
-                              },
-                              min: 0,
-                            ),
-                          ),
-                          if (!widget.isLive) ...[
-                            Positioned.fill(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  height: 4,
-                                  width: (_videoBuffered.inSeconds.toDouble() /
-                                      (_videoDuration.inSeconds
-                                          .toDouble() ==
-                                          0
-                                          ? 1
-                                          : _videoDuration.inSeconds
-                                          .toDouble())) *
-                                      MediaQuery.of(context).size.width,
-                                  color: Colors.blue.withOpacity(0.5),
-                                ),
-                              ),
-                            ),
-                            Positioned.fill(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Container(
-                                  height: 4,
-                                  width: (_videoPosition.inSeconds.toDouble() /
-                                      (_videoDuration.inSeconds
-                                          .toDouble() ==
-                                          0
-                                          ? 1
-                                          : _videoDuration.inSeconds
-                                          .toDouble())) *
-                                      MediaQuery.of(context).size.width,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              left: (_videoPosition.inSeconds.toDouble() /
-                                  (_videoDuration.inSeconds
-                                      .toDouble() ==
-                                      0
-                                      ? 1
-                                      : _videoDuration.inSeconds
-                                      .toDouble())) *
-                                  MediaQuery.of(context).size.width -
-                                  8,
-                              bottom: 15,
-                              child: Container(
-                                height: 16,
-                                width: 16,
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
+                      IconButton(
+                        icon: Icon(
+                          _videoPlayerController.value.isPlaying
+                              ? Icons.pause
+                              : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        onPressed: _togglePlayPause,
                       ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              _videoPlayerController.value.isPlaying
-                                  ? Icons.pause
-                                  : Icons.play_arrow,
-                              color: Colors.white,
-                            ),
-                            onPressed: _togglePlayPause,
-                            splashColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _isFullScreen
-                                  ? Icons.fullscreen_exit
-                                  : Icons.fullscreen,
-                              color: Colors.white,
-                            ),
-                            onPressed: _toggleFullScreen,
-                            splashColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                          ),
-                        ],
+                      IconButton(
+                        icon: Icon(Icons.aspect_ratio, color: Colors.white),
+                        onPressed: _toggleAspectRatio,
                       ),
                     ],
                   ),
@@ -826,10 +789,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ),
       floatingActionButton: _isFullScreen
           ? FloatingActionButton(
-        onPressed: () => Navigator.of(context).pop(),
-        child: Icon(Icons.arrow_back),
-        backgroundColor: Colors.black,
-      )
+              onPressed: () => Navigator.of(context).pop(),
+              child: Icon(Icons.arrow_back),
+              backgroundColor: Colors.black,
+            )
           : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
