@@ -19,7 +19,8 @@ dependencies:
 #  firebase_messaging: ^15.1.1
 #  flutter_local_notifications: ^17.0.0
 #  firebase_core: ^3.4.1
-  better_player: ^0.0.84
+  chewie:
+  video_player:
 
 
   cupertino_icons: ^1.0.8

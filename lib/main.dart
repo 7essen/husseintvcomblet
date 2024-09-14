@@ -7,7 +7,8 @@ import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
-import 'package:better_player/better_player.dart';
+import 'package:chewie/chewie.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -670,45 +671,148 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late BetterPlayerController _betterPlayerController;
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isControlsVisible = true;
+  bool _isFullScreen = false;
+
+  List<double> aspectRatios = [
+    16 / 9,
+    4 / 3,
+    18 / 9,
+    21 / 9
+  ]; // Available aspect ratios
+  int currentAspectRatioIndex = 0; // To keep track of the current aspect ratio
 
   @override
   void initState() {
     super.initState();
+    _videoPlayerController = VideoPlayerController.network(widget.url)
+      ..initialize().then((_) {
+        setState(() {
+          _setupChewie(aspectRatios[
+              currentAspectRatioIndex]); // Initialize with the first aspect ratio
+        });
+      });
 
-    BetterPlayerDataSource betterPlayerDataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
-      widget.url,
-      liveStream: widget.isLive,
-    );
+    // Hide the status bar and navigation bar when entering full-screen mode
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
 
-    _betterPlayerController = BetterPlayerController(
-      BetterPlayerConfiguration(
-        aspectRatio: 16 / 9,
-        autoPlay: true,
-        fullScreenByDefault: true,
-        controlsConfiguration: BetterPlayerControlsConfiguration(
-          enableFullscreen: true,
-          enablePlayPause: true,
-        ),
-      ),
-      betterPlayerDataSource: betterPlayerDataSource,
+  void _setupChewie(double aspectRatio) {
+    _chewieController
+        ?.dispose(); // Dispose the old controller before creating a new one
+
+    _chewieController = ChewieController(
+      videoPlayerController: _videoPlayerController,
+      aspectRatio: aspectRatio, // Set the new aspect ratio
+      autoPlay: true,
+      looping: widget.isLive ? false : true,
+      showControlsOnInitialize: true,
+      errorBuilder: (context, errorMessage) {
+        return Center(
+          child: Text(
+            errorMessage,
+            style: TextStyle(color: Colors.white),
+          ),
+        );
+      },
     );
   }
 
   @override
   void dispose() {
-    _betterPlayerController.dispose();
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
+    // Restore the system UI when exiting the video player
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  void _toggleControlsVisibility() {
+    setState(() {
+      _isControlsVisible = !_isControlsVisible;
+    });
+  }
+
+  void _toggleAspectRatio() {
+    setState(() {
+      // Change the current aspect ratio to the next one in the list
+      currentAspectRatioIndex =
+          (currentAspectRatioIndex + 1) % aspectRatios.length;
+      _setupChewie(aspectRatios[
+          currentAspectRatioIndex]); // Recreate ChewieController with new aspect ratio
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: BetterPlayer(
-        controller: _betterPlayerController,
+      body: GestureDetector(
+        onTap: _toggleControlsVisibility,
+        child: Stack(
+          children: [
+            Center(
+              child: _chewieController != null &&
+                      _chewieController!
+                          .videoPlayerController.value.isInitialized
+                  ? Chewie(
+                      controller: _chewieController!,
+                    )
+                  : Container(color: Colors.black),
+            ),
+            if (_isControlsVisible)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(8)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          _videoPlayerController.value.isPlaying
+                              ? Icons.pause
+                              : Icons.play_arrow,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            if (_videoPlayerController.value.isPlaying) {
+                              _videoPlayerController.pause();
+                            } else {
+                              _videoPlayerController.play();
+                            }
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.aspect_ratio, color: Colors.white),
+                        onPressed: _toggleAspectRatio,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
+      floatingActionButton: _isFullScreen
+          ? FloatingActionButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Icon(Icons.arrow_back),
+              backgroundColor: Colors.black,
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 }
