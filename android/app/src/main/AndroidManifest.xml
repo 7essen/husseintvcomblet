@@ -12,10 +12,10 @@
 
     <application
         android:label="7eSen TV"
-
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">  <!-- Add this line here -->
+        android:usesCleartextTraffic="true"
+        android:enableOnBackInvokedCallback="true">
 
         <meta-data
             android:name="firebase_messaging_auto_init_enabled"

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:chewie/chewie.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
+import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
+import 'package:video_player/video_player.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,7 +19,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Hussein TV',
+      title: '7eSen TV',
       theme: ThemeData(
         primaryColor: Color(0xFF512da8),
         scaffoldBackgroundColor: Color(0xFF673ab7),
@@ -168,7 +169,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Hussein TV'),
+        title: Text('7eSen TV'),
       ),
       body: IndexedStack(
         index: _selectedIndex,
@@ -208,7 +209,7 @@ class _HomePageState extends State<HomePage> {
     if (url != null && url.isNotEmpty) {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => VideoPlayerScreen(url: url),
+          builder: (context) => VideoPlayerScreen(url: url, title: 'البث المباشر'),
         ),
       );
     } else {
@@ -369,7 +370,7 @@ class MatchesSection extends StatelessWidget {
             if (match == null || match['attributes'] == null) continue;
 
             final matchDateTime =
-                DateFormat('HH:mm').parse(match['attributes']['matchTime']);
+            DateFormat('HH:mm').parse(match['attributes']['matchTime']);
             final now = DateTime.now();
             final matchDateTimeWithToday = DateTime(now.year, now.month,
                 now.day, matchDateTime.hour, matchDateTime.minute);
@@ -388,9 +389,9 @@ class MatchesSection extends StatelessWidget {
           // ترتيب المباريات القادمة من الأقرب للأبعد
           upcomingMatches.sort((a, b) {
             final matchTimeA =
-                DateFormat('HH:mm').parse(a['attributes']['matchTime']);
+            DateFormat('HH:mm').parse(a['attributes']['matchTime']);
             final matchTimeB =
-                DateFormat('HH:mm').parse(b['attributes']['matchTime']);
+            DateFormat('HH:mm').parse(b['attributes']['matchTime']);
             return matchTimeA.compareTo(matchTimeB);
           });
 
@@ -618,7 +619,7 @@ class NewsBox extends StatelessWidget {
                       Text(
                         article['date'] != null
                             ? DateFormat('yyyy-MM-dd')
-                                .format(DateTime.parse(article['date']))
+                            .format(DateTime.parse(article['date']))
                             : 'No date available',
                         style: TextStyle(fontSize: 12, color: Colors.grey),
                       ),
@@ -661,77 +662,195 @@ class NewsBox extends StatelessWidget {
 
 class VideoPlayerScreen extends StatefulWidget {
   final String url;
-  final bool isLive;
+  final String title;
 
-  VideoPlayerScreen({required this.url, this.isLive = false});
+  VideoPlayerScreen({required this.url, required this.title});
 
   @override
   _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VlcPlayerController _vlcPlayerController;
-  bool _isFullScreen = false;
-  List<double> aspectRatios = [16 / 9, 4 / 3, 18 / 9, 21 / 9]; // نسب العرض المتاحة
-  int currentAspectRatioIndex = 0; // لتتبع نسبة العرض الحالية
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _vlcPlayerController = VlcPlayerController.network(
-      widget.url,
-      autoPlay: true,
-      options: VlcPlayerOptions(),
-    );
+    _initializePlayer();
   }
 
-  @override
-  void dispose() {
-    _vlcPlayerController.dispose();
-    super.dispose();
+  Future<void> _initializePlayer() async {
+    try {
+      // Add headers to match VLC request
+      final Map<String, String> headers = {
+        'User-Agent': 'VLC/2.2.4 LibVLC/2.2.4',
+        'Range': 'bytes=0-',
+        'Connection': 'close',
+        'Icy-MetaData': '1',
+      };
+
+      // Ensure URL is properly formatted
+      final Uri videoUri = Uri.parse(widget.url);
+      final String fullUrl = videoUri.scheme.isEmpty 
+          ? 'http://${videoUri.toString()}'  // Add http:// if missing
+          : widget.url;
+
+      _videoPlayerController = VideoPlayerController.networkUrl(
+        Uri.parse(fullUrl),
+        httpHeaders: headers,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+
+      await _videoPlayerController.initialize();
+      
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: _videoPlayerController.value.aspectRatio,
+        allowFullScreen: true,
+        allowMuting: true,
+        showControls: true,
+        allowPlaybackSpeedChanging: true,
+        showControlsOnInitialize: false,
+        placeholder: Center(
+          child: CircularProgressIndicator(
+            color: Theme.of(context).primaryColor,
+          ),
+        ),
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Theme.of(context).primaryColor,
+          handleColor: Theme.of(context).primaryColor,
+          backgroundColor: Colors.grey[300]!,
+          bufferedColor: Theme.of(context).primaryColor.withOpacity(0.5),
+        ),
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 48,
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Error: ${errorMessage ?? "Failed to load video"}',
+                  style: TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      'Technical details: $_errorMessage',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _retryPlayback,
+                  icon: Icon(Icons.refresh),
+                  label: Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      
+      setState(() {
+        _isLoading = false;
+        _errorMessage = null;
+      });
+    } catch (error) {
+      print('Video player error: $error');
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.toString();
+      });
+    }
   }
 
-  void _toggleAspectRatio() {
+  void _retryPlayback() {
     setState(() {
-      // تغيير نسبة العرض الحالية إلى النسبة التالية في القائمة
-      currentAspectRatioIndex = (currentAspectRatioIndex + 1) % aspectRatios.length;
+      _isLoading = true;
+      _errorMessage = null;
     });
+    _initializePlayer();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Center(
-            child: VlcPlayer(
-              controller: _vlcPlayerController,
-              aspectRatio: aspectRatios[currentAspectRatioIndex], // استخدام نسبة العرض المتغيرة
-              placeholder: Center(child: CircularProgressIndicator()),
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              color: Colors.black.withOpacity(0.5),
-              padding: EdgeInsets.all(8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.aspect_ratio, color: Colors.white),
-                    onPressed: _toggleAspectRatio,
-                  ),
-                  // يمكنك إضافة أزرار أخرى للتحكم هنا
-                ],
-              ),
-            ),
-          ),
-        ],
+      appBar: AppBar(
+        title: Text(widget.title),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: Center(
+          child: _errorMessage != null
+              ? Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                    SizedBox(height: 16),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Error: $_errorMessage',
+                        style: TextStyle(color: Colors.white),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _retryPlayback,
+                      icon: Icon(Icons.refresh),
+                      label: Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      ),
+                    ),
+                  ],
+                )
+              : _isLoading
+                  ? CircularProgressIndicator(
+                      color: Theme.of(context).primaryColor,
+                    )
+                  : _chewieController != null
+                      ? AspectRatio(
+                          aspectRatio: _chewieController!.aspectRatio ?? 16 / 9,
+                          child: Chewie(controller: _chewieController!),
+                        )
+                      : CircularProgressIndicator(
+                          color: Theme.of(context).primaryColor,
+                        ),
+        ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
+    super.dispose();
   }
 }
