@@ -6,7 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
-import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
+import 'package:flutter/services.dart' show SystemChrome, SystemUiMode, DeviceOrientation;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io' show Platform;
@@ -685,34 +685,53 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      // Basic headers that work on both platforms
-      final Map<String, String> headers = {
-        'User-Agent': Platform.isIOS ? 'iPhone' : 'VLC/2.2.4 LibVLC/2.2.4',
-        'Connection': 'keep-alive',
-      };
+      if (Platform.isIOS) {
+        // Simple configuration for iOS
+        _videoPlayerController = VideoPlayerController.networkUrl(
+          Uri.parse(widget.url),
+        );
+      } else {
+        // Full configuration for Android
+        final Map<String, String> headers = {
+          'User-Agent': 'VLC/2.2.4 LibVLC/2.2.4',
+          'Range': 'bytes=0-',
+          'Connection': 'close',
+          'Icy-MetaData': '1',
+        };
 
-      final Uri videoUri = Uri.parse(widget.url);
-      final String fullUrl = videoUri.scheme.isEmpty 
-          ? 'http://${videoUri.toString()}'
-          : widget.url;
+        final Uri videoUri = Uri.parse(widget.url);
+        final String fullUrl = videoUri.scheme.isEmpty 
+            ? 'http://${videoUri.toString()}'
+            : widget.url;
 
-      await Future.delayed(Duration(milliseconds: 100)); // Small delay for iOS
+        _videoPlayerController = VideoPlayerController.networkUrl(
+          Uri.parse(fullUrl),
+          httpHeaders: headers,
+        );
+      }
 
-      _videoPlayerController = VideoPlayerController.networkUrl(
-        Uri.parse(fullUrl),
-        httpHeaders: headers,
-      );
+      // Initialize with timeout
+      bool initialized = false;
+      try {
+        await _videoPlayerController.initialize().timeout(
+          Duration(seconds: 15),
+          onTimeout: () {
+            throw TimeoutException('Video initialization timed out');
+          },
+        );
+        initialized = true;
+      } catch (e) {
+        print('Initialization error: $e');
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+        return;
+      }
 
-      // Wait for controller to initialize
-      await _videoPlayerController.initialize().timeout(
-        Duration(seconds: 10),
-        onTimeout: () {
-          throw TimeoutException('Video initialization timed out');
-        },
-      );
+      if (!mounted || !initialized) return;
 
-      if (!mounted) return;
-      
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController,
         autoPlay: true,
@@ -721,8 +740,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         allowFullScreen: true,
         allowMuting: true,
         showControls: true,
-        allowPlaybackSpeedChanging: false,
-        showControlsOnInitialize: true,
         placeholder: Center(
           child: CircularProgressIndicator(
             color: Theme.of(context).primaryColor,
@@ -734,47 +751,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           backgroundColor: Colors.grey[300]!,
           bufferedColor: Theme.of(context).primaryColor.withOpacity(0.5),
         ),
-        errorBuilder: (context, errorMessage) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.error_outline,
-                  color: Colors.red,
-                  size: 48,
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Error: ${errorMessage ?? "Failed to load video"}',
-                  style: TextStyle(color: Colors.white),
-                  textAlign: TextAlign.center,
-                ),
-                if (_errorMessage != null)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Text(
-                      'Technical details: $_errorMessage',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _retryPlayback,
-                  icon: Icon(Icons.refresh),
-                  label: Text('Retry'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).primaryColor,
-                    padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
       );
-      
+
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -857,8 +835,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
-    _videoPlayerController.dispose();
-    _chewieController?.dispose();
+    try {
+      _videoPlayerController.dispose();
+      _chewieController?.dispose();
+    } catch (e) {
+      print('Dispose error: $e');
+    }
     super.dispose();
   }
 }
