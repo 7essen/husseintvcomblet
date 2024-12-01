@@ -686,12 +686,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Future<void> _initializePlayer() async {
     try {
       if (Platform.isIOS) {
-        // Simple configuration for iOS
-        _videoPlayerController = VideoPlayerController.networkUrl(
-          Uri.parse(widget.url),
+        // iOS specific implementation
+        final Uri videoUri = Uri.parse(widget.url);
+        final String fullUrl = videoUri.scheme.isEmpty 
+            ? 'http://${videoUri.toString()}'
+            : widget.url;
+
+        // Wait for any previous instances to be cleaned up
+        await Future.delayed(Duration(milliseconds: 300));
+        
+        _videoPlayerController = VideoPlayerController.network(
+          fullUrl,
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
         );
+
+        // Simple initialization for iOS
+        try {
+          await _videoPlayerController.initialize();
+        } catch (e) {
+          print('iOS init error: $e');
+          // Try recreating the controller if first attempt fails
+          _videoPlayerController.dispose();
+          await Future.delayed(Duration(milliseconds: 300));
+          _videoPlayerController = VideoPlayerController.network(fullUrl);
+          await _videoPlayerController.initialize();
+        }
       } else {
-        // Full configuration for Android
+        // Android configuration remains unchanged
         final Map<String, String> headers = {
           'User-Agent': 'VLC/2.2.4 LibVLC/2.2.4',
           'Range': 'bytes=0-',
@@ -708,29 +729,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           Uri.parse(fullUrl),
           httpHeaders: headers,
         );
+
+        await _videoPlayerController.initialize();
       }
 
-      // Initialize with timeout
-      bool initialized = false;
-      try {
-        await _videoPlayerController.initialize().timeout(
-          Duration(seconds: 15),
-          onTimeout: () {
-            throw TimeoutException('Video initialization timed out');
-          },
-        );
-        initialized = true;
-      } catch (e) {
-        print('Initialization error: $e');
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = e.toString();
-          _isLoading = false;
-        });
-        return;
-      }
-
-      if (!mounted || !initialized) return;
+      if (!mounted) return;
 
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController,
