@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/services.dart' show SystemChrome, SystemUiMode;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:video_player/video_player.dart';
+import 'dart:io' show Platform;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -684,11 +685,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
+      // Basic headers that work on both platforms
       final Map<String, String> headers = {
-        'User-Agent': 'VLC/2.2.4 LibVLC/2.2.4',
-        'Range': 'bytes=0-',
-        'Connection': 'close',
-        'Icy-MetaData': '1',
+        'User-Agent': Platform.isIOS ? 'iPhone' : 'VLC/2.2.4 LibVLC/2.2.4',
+        'Connection': 'keep-alive',
       };
 
       final Uri videoUri = Uri.parse(widget.url);
@@ -696,12 +696,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           ? 'http://${videoUri.toString()}'
           : widget.url;
 
+      await Future.delayed(Duration(milliseconds: 100)); // Small delay for iOS
+
       _videoPlayerController = VideoPlayerController.networkUrl(
         Uri.parse(fullUrl),
         httpHeaders: headers,
       );
 
-      await _videoPlayerController.initialize();
+      // Wait for controller to initialize
+      await _videoPlayerController.initialize().timeout(
+        Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('Video initialization timed out');
+        },
+      );
+
+      if (!mounted) return;
       
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController,
@@ -711,8 +721,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         allowFullScreen: true,
         allowMuting: true,
         showControls: true,
-        allowPlaybackSpeedChanging: false,  // Disable speed changing for better compatibility
-        showControlsOnInitialize: false,
+        allowPlaybackSpeedChanging: false,
+        showControlsOnInitialize: true,
         placeholder: Center(
           child: CircularProgressIndicator(
             color: Theme.of(context).primaryColor,
@@ -765,16 +775,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         },
       );
       
-      setState(() {
-        _isLoading = false;
-        _errorMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      }
     } catch (error) {
       print('Video player error: $error');
-      setState(() {
-        _isLoading = false;
-        _errorMessage = error.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = error.toString();
+        });
+      }
     }
   }
 
@@ -807,13 +821,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       size: 48,
                     ),
                     SizedBox(height: 16),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        'Error: $_errorMessage',
-                        style: TextStyle(color: Colors.white),
-                        textAlign: TextAlign.center,
-                      ),
+                    Text(
+                      'Error: $_errorMessage',
+                      style: TextStyle(color: Colors.white),
+                      textAlign: TextAlign.center,
                     ),
                     SizedBox(height: 16),
                     ElevatedButton.icon(
