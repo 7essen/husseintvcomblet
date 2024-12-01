@@ -684,7 +684,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   Future<void> _initializePlayer() async {
     try {
-      // Add headers to match VLC request
       final Map<String, String> headers = {
         'User-Agent': 'VLC/2.2.4 LibVLC/2.2.4',
         'Range': 'bytes=0-',
@@ -692,16 +691,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         'Icy-MetaData': '1',
       };
 
-      // Ensure URL is properly formatted
       final Uri videoUri = Uri.parse(widget.url);
       final String fullUrl = videoUri.scheme.isEmpty 
-          ? 'http://${videoUri.toString()}'  // Add http:// if missing
+          ? 'http://${videoUri.toString()}'
           : widget.url;
 
       _videoPlayerController = VideoPlayerController.networkUrl(
         Uri.parse(fullUrl),
         httpHeaders: headers,
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
       );
 
       await _videoPlayerController.initialize();
@@ -714,7 +711,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         allowFullScreen: true,
         allowMuting: true,
         showControls: true,
-        allowPlaybackSpeedChanging: true,
+        allowPlaybackSpeedChanging: false,  // Disable speed changing for better compatibility
         showControlsOnInitialize: false,
         placeholder: Center(
           child: CircularProgressIndicator(
